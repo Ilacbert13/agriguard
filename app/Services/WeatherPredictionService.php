@@ -127,7 +127,10 @@ class WeatherPredictionService
             throw new RuntimeException('Missing model at '.$modelPath);
         }
 
-        $pythonBin = (string) config('agriweather.prediction.python_bin', base_path('.venv/Scripts/python.exe'));
+        $fallbackPython = PHP_OS_FAMILY === 'Windows'
+            ? base_path('.venv/Scripts/python.exe')
+            : base_path('.venv/bin/python');
+        $pythonBin = (string) config('agriweather.prediction.python_bin', $fallbackPython);
         if (! is_file($pythonBin)) {
             throw new RuntimeException('Python interpreter not found at '.$pythonBin);
         }
