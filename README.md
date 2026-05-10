@@ -65,19 +65,25 @@ Laravel + MySQL farm app. Install **PHP 8.2+**, **Composer**, **Node/npm**, **My
 
 ## Railway (Docker)
 
-**`railway.toml`** builds from the Dockerfile and sets **`startCommand`** to **`php artisan serve`** only (no migrate on boot). That avoids Railway racing MySQL during pre-deploy / complicated start scripts.
+**`railway.toml`** expects **Dockerfile builds** (`builder = DOCKERFILE`). On the service:
 
-1. **Dashboard → Deploy → Pre-deploy command:** leave **empty**.
-2. **Dashboard → Deploy → Custom Start Command:** leave **empty** so **`railway.toml`** applies, or set explicitly to the same as in **`railway.toml`** (`php artisan serve --host 0.0.0.0 --port $PORT` via `sh -c` — see file).
-3. Link **Variables** from your MySQL service (**Reference** `MYSQL_*` / `DATABASE_URL`).
+1. **Build → Builder:** choose **Docker** / build from **Dockerfile**, **not** Railpack — the image installs PHP/Composer/Node and copies the app; **Vite runs when the container starts** (`npm install && npm run build`), then **`php artisan serve`** (see **`railway.toml`** `startCommand`).
+2. **Deploy → Pre-deploy command:** leave **completely empty**. Do **not** chain `npm`/`serve`/`migrate` here.
+3. **Deploy → Custom Start Command:** leave **empty** so **`railway.toml`** `startCommand` applies.
 
-**Migrations (manual):** after the service is running and MySQL is reachable, open **Railway Shell** on the web service and run:
+First boot can take longer while **`npm install`** runs; **`healthcheckTimeout`** in **`railway.toml`** is set to **600** seconds. **`APP_URL`** must be your real Railway HTTPS URL so `@vite`/`asset()` don’t point at `127.0.0.1`.
+
+**Migrations without Railway Shell:** temporarily change **`startCommand`** in **`railway.toml`** to  
+`/usr/local/bin/agriguard-start`  
+(that script waits for DB, runs **`docker/agriguard-db-setup.php`**, then serves). Switch back to **`serve`** only after DB is seeded if you prefer.
+
+**Migrations with Shell (if your plan includes it):**
 
 ```bash
 php artisan migrate --force && php artisan db:seed --force && php artisan historical-weather:import storage/app/public/historical_weather.csv
 ```
 
-Other platforms (e.g. Render) still use the Dockerfile **`CMD`** (`agriguard-start`) if you do not override **`startCommand`** there.
+Other platforms (e.g. Render) use the Dockerfile **`CMD`** (`agriguard-start`) unless overridden.
 
 ## Default login (after seed)
 

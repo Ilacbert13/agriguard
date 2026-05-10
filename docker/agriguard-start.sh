@@ -3,6 +3,8 @@ set -eu
 
 cd /var/www/html
 
+/usr/local/bin/vite-build
+
 # Single PHP process: wait + migrate + seed + CSV (see docker/agriguard-db-setup.php).
 php docker/agriguard-db-setup.php
 

@@ -14,7 +14,8 @@ WORKDIR /var/www/html
 COPY . .
 
 RUN composer install --no-dev --optimize-autoloader
-RUN npm install && npm run build
+
+# Frontend build runs at container start (docker/vite-build.sh), not here — keeps image smaller and matches Railway startCommand.
 
 RUN mkdir -p storage/framework/cache \
     storage/framework/sessions \
@@ -23,10 +24,11 @@ RUN mkdir -p storage/framework/cache \
 
 RUN chmod -R 775 storage bootstrap/cache
 
+COPY docker/vite-build.sh /usr/local/bin/vite-build
 COPY docker/agriguard-start.sh /usr/local/bin/agriguard-start
-RUN chmod +x /usr/local/bin/agriguard-start
+RUN chmod +x /usr/local/bin/vite-build /usr/local/bin/agriguard-start
 
 EXPOSE 10000
 
-# PID 1: docker/agriguard-start.sh — wait for DB, migrate/seed/csv import, then php -S (public/up for health).
+# PID 1: vite-build → agriguard-db-setup → php built-in server on public/ (see docker/agriguard-start.sh).
 CMD ["/usr/local/bin/agriguard-start"]

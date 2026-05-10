@@ -1,19 +1,23 @@
 # https://docs.railway.com/guides/config-as-code
 #
-# Railway dashboard (this service):
-#   Deploy → Pre-deploy command        → leave EMPTY (no migrate / seed here).
-#   Deploy → Custom Start Command      → Leave empty so this file applies, OR paste the same as startCommand below.
+# Railway dashboard MUST match this file:
 #
-# Migrations are NOT run automatically on Railway — run once from Railway Shell after DB is up, e.g.:
-#   php artisan migrate --force && php artisan db:seed --force && php artisan historical-weather:import storage/app/public/historical_weather.csv
+# Build → Builder: Docker (from Dockerfile), NOT Railpack — image installs Composer deps only;
+# Vite runs at container start (`npm install && npm run build` + `serve` below).
 #
-# Dockerfiles still default to agriguard-start for other hosts (e.g. Render); Railway overrides via startCommand below.
+# Deploy → Pre-deploy command: leave COMPLETELY EMPTY.
+#   Never put `php artisan serve` here (that's the Start command).
+#
+# Deploy → Custom Start Command: leave empty so `startCommand` below applies.
+#
+# No Railway Shell? Run DB setup locally against prod DB, or temporarily set startCommand to
+# docker/agriguard-start.sh (migrate+seed+import then serve) — see README.
 
 [build]
 builder = "DOCKERFILE"
 
 [deploy]
-# Same as: php artisan serve --host 0.0.0.0 --port $PORT  (sh -c so PORT expands inside the container)
-startCommand = "sh -c 'exec php artisan serve --host 0.0.0.0 --port ${PORT:-10000}'"
+# Inner script uses double quotes so ${PORT:-10000} expands (single-quoted sh -c would not).
+startCommand = "sh -c \"npm install && npm run build && php artisan serve --host 0.0.0.0 --port ${PORT:-10000}\""
 healthcheckPath = "/up"
-healthcheckTimeout = 300
+healthcheckTimeout = 600
