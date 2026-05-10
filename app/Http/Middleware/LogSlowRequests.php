@@ -26,6 +26,11 @@ class LogSlowRequests
 {
     public function handle(Request $request, Closure $next): Response
     {
+        // Synthetic Laravel route /up may still run behind nginx; skip DB instrumentation.
+        if ($request->path() === 'up') {
+            return $next($request);
+        }
+
         if (! filter_var(env('PERF_LOG_ENABLED', true), FILTER_VALIDATE_BOOLEAN)) {
             return $next($request);
         }

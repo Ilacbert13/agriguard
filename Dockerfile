@@ -23,9 +23,12 @@ RUN mkdir -p storage/framework/cache \
 
 RUN chmod -R 775 storage bootstrap/cache
 
+COPY docker/web-entrypoint.sh /usr/local/bin/agriguard-web
+RUN chmod +x /usr/local/bin/agriguard-web
+
 EXPOSE 10000
 
-# Migrations run in Render's pre-deploy phase (see render.yaml), not here — so the process
-# listens immediately and /up can pass even if the database is temporarily unreachable.
-# $$ escapes $ for Docker; $${PORT:-10000} is expanded by sh at container start.
-CMD sh -c "exec php artisan serve --host=0.0.0.0 --port=$${PORT:-10000}"
+# JSON CMD + exec wrapper: correct PID 1 signals (see Docker JSONArgsRecommended).
+# Static file public/up is served by PHP's built-in router before Laravel boots — stable LoadBalancer healthchecks.
+# Migrations: Render pre-deploy (render.yaml).
+CMD ["/usr/local/bin/agriguard-web"]

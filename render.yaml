@@ -31,6 +31,7 @@ services:
     name: agriguard
     runtime: docker
     plan: free
+    # GET /up is served as static public/up (see Dockerfile) so probes succeed without booting Laravel.
     healthCheckPath: /up
     # Runs before traffic shifts to new deploys; keeps Dockerfile CMD free of migrate so the server starts without blocking on MySQL.
     preDeployCommand: php artisan migrate --force
