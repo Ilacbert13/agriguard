@@ -74,9 +74,6 @@
                     <p>
                         AGRIGUARD is an AI-powered smart agriculture system designed to support farmers through predictive weather analytics, machine learning models, and real-time farm data integration. The system helps improve agricultural productivity by providing data-driven insights for better decision-making.
                     </p>
-                    <p>
-                        AGRIGUARD integrates weather forecasting, rainfall prediction, crop monitoring, mapping tools, and AI assistance into a unified agricultural intelligence platform. It enables farmers to monitor farm conditions and receive intelligent recommendations based on predictive analytics.
-                    </p>
                 </div>
             </div>
 
