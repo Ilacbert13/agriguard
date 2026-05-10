@@ -63,6 +63,16 @@ Laravel + MySQL farm app. Install **PHP 8.2+**, **Composer**, **Node/npm**, **My
 
    Use another file by passing its path instead.
 
+## Railway (Docker)
+
+This repo uses **`railway.toml`** (Dockerfile build, **`startCommand`** = `agriguard-start`). Migrations, seed, and historical CSV import run **inside the container** after **`docker/wait-for-laravel-db.php`** — not in Railway’s pre-deploy phase.
+
+1. **Clear the pre-deploy command in the dashboard** (Service → **Settings** → **Deploy** → **Pre-deploy command**): leave it **empty** and save. If `php artisan migrate` is set there, it often runs while MySQL is still starting and fails with connection refused / timed out.
+2. Link **Variables** from your MySQL service (**Reference** `MYSQL_*` / `DATABASE_URL` into `DB_*` or use `DATABASE_URL` as Laravel expects).
+3. Redeploy after pushing so the image includes **`docker/agriguard-start.sh`** and **`docker/wait-for-laravel-db.php`**.
+
+Optional tuning (variables): `AGRIGUARD_POST_TCP_SLEEP` (seconds after DB wait, default 15), `AGRIGUARD_DB_WAIT_ATTEMPTS`, `AGRIGUARD_DB_WAIT_SLEEP`.
+
 ## Default login (after seed)
 
 | Email | Password |
@@ -77,4 +87,5 @@ Laravel + MySQL farm app. Install **PHP 8.2+**, **Composer**, **Node/npm**, **My
 | Missing uploads | `php artisan storage:link` |
 | Blank styles/scripts | `npm run build` |
 | Database | MySQL running; fix `DB_*` in `.env` |
+| Railway migrate timeout | Empty **Pre-deploy command** in Railway; use repo `railway.toml`; see **Railway** section above |
 | Python / predictions | `.venv` at repo root, `pip install -r python/requirements.txt`, model in `python/model/`, set `AGRIWEATHER_PYTHON_BIN` on Mac/Linux, run `verify_model_load.py` |

@@ -1,10 +1,14 @@
 # https://docs.railway.com/guides/config-as-code
+#
+# IMPORTANT — Railway dashboard: remove any "Pre-deploy command" (e.g. php artisan migrate).
+# That runs before the app container and races MySQL startup. This repo does NOT set
+# preDeployCommand here; migrations run only in docker/agriguard-start.sh after
+# docker/wait-for-laravel-db.php succeeds.
+#
 [build]
 builder = "DOCKERFILE"
 
 [deploy]
-# Do not use preDeployCommand for migrate: it often cannot reach private MySQL (*.railway.internal).
-# DB setup runs in the container start script (docker/agriguard-start.sh) instead.
 startCommand = "/usr/local/bin/agriguard-start"
 healthcheckPath = "/up"
 # Migrate + seed + CSV import can exceed 5m on first deploy — increase if healthchecks fail.

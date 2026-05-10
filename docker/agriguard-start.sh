@@ -5,7 +5,8 @@ cd /var/www/html
 
 # DB migrate/seed/import run here (not Railway pre-deploy). Wait for Laravel PDO (same as migrate).
 php docker/wait-for-laravel-db.php
-sleep "${AGRIGUARD_POST_TCP_SLEEP:-5}"
+# Extra pause after PDO connects — avoids migrate racing a MySQL that is not ready for DDL yet.
+sleep "${AGRIGUARD_POST_TCP_SLEEP:-15}"
 
 php artisan migrate --force
 php artisan db:seed --force
