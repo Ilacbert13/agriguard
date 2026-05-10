@@ -1,15 +1,19 @@
 # https://docs.railway.com/guides/config-as-code
 #
-# IMPORTANT — Railway dashboard: remove any "Pre-deploy command" (e.g. php artisan migrate).
-# That runs before the app container and races MySQL startup. This repo does NOT set
-# preDeployCommand here; migrations run only in docker/agriguard-start.sh after
-# docker/wait-for-laravel-db.php succeeds.
+# Railway dashboard (this service):
+#   Deploy → Pre-deploy command        → leave EMPTY (no migrate / seed here).
+#   Deploy → Custom Start Command      → Leave empty so this file applies, OR paste the same as startCommand below.
 #
+# Migrations are NOT run automatically on Railway — run once from Railway Shell after DB is up, e.g.:
+#   php artisan migrate --force && php artisan db:seed --force && php artisan historical-weather:import storage/app/public/historical_weather.csv
+#
+# Dockerfiles still default to agriguard-start for other hosts (e.g. Render); Railway overrides via startCommand below.
+
 [build]
 builder = "DOCKERFILE"
 
 [deploy]
-startCommand = "/usr/local/bin/agriguard-start"
+# Same as: php artisan serve --host 0.0.0.0 --port $PORT  (sh -c so PORT expands inside the container)
+startCommand = "sh -c 'exec php artisan serve --host 0.0.0.0 --port ${PORT:-10000}'"
 healthcheckPath = "/up"
-# Migrate + seed + CSV import can exceed 5m on first deploy — increase if healthchecks fail.
-healthcheckTimeout = 600
+healthcheckTimeout = 300

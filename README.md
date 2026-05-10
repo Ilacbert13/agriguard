@@ -65,13 +65,19 @@ Laravel + MySQL farm app. Install **PHP 8.2+**, **Composer**, **Node/npm**, **My
 
 ## Railway (Docker)
 
-This repo uses **`railway.toml`** (Dockerfile build, **`startCommand`** = `agriguard-start`). Migrations, seed, and historical CSV import run **inside the container** after **`docker/wait-for-laravel-db.php`** — not in Railway’s pre-deploy phase.
+**`railway.toml`** builds from the Dockerfile and sets **`startCommand`** to **`php artisan serve`** only (no migrate on boot). That avoids Railway racing MySQL during pre-deploy / complicated start scripts.
 
-1. **Clear the pre-deploy command in the dashboard** (Service → **Settings** → **Deploy** → **Pre-deploy command**): leave it **empty** and save. If `php artisan migrate` is set there, it often runs while MySQL is still starting and fails with connection refused / timed out.
-2. Link **Variables** from your MySQL service (**Reference** `MYSQL_*` / `DATABASE_URL` into `DB_*` or use `DATABASE_URL` as Laravel expects).
-3. Redeploy after pushing so the image includes **`docker/agriguard-start.sh`** and **`docker/wait-for-laravel-db.php`**.
+1. **Dashboard → Deploy → Pre-deploy command:** leave **empty**.
+2. **Dashboard → Deploy → Custom Start Command:** leave **empty** so **`railway.toml`** applies, or set explicitly to the same as in **`railway.toml`** (`php artisan serve --host 0.0.0.0 --port $PORT` via `sh -c` — see file).
+3. Link **Variables** from your MySQL service (**Reference** `MYSQL_*` / `DATABASE_URL`).
 
-Optional tuning (variables): `AGRIGUARD_POST_TCP_SLEEP` (seconds after DB wait, default 15), `AGRIGUARD_DB_WAIT_ATTEMPTS`, `AGRIGUARD_DB_WAIT_SLEEP`.
+**Migrations (manual):** after the service is running and MySQL is reachable, open **Railway Shell** on the web service and run:
+
+```bash
+php artisan migrate --force && php artisan db:seed --force && php artisan historical-weather:import storage/app/public/historical_weather.csv
+```
+
+Other platforms (e.g. Render) still use the Dockerfile **`CMD`** (`agriguard-start`) if you do not override **`startCommand`** there.
 
 ## Default login (after seed)
 
@@ -87,5 +93,5 @@ Optional tuning (variables): `AGRIGUARD_POST_TCP_SLEEP` (seconds after DB wait, 
 | Missing uploads | `php artisan storage:link` |
 | Blank styles/scripts | `npm run build` |
 | Database | MySQL running; fix `DB_*` in `.env` |
-| Railway migrate timeout | Empty **Pre-deploy command** in Railway; use repo `railway.toml`; see **Railway** section above |
+| Railway DB / migrate | Empty **Pre-deploy** & **Custom Start** (use `railway.toml`); migrate via **Shell** — see **Railway** section |
 | Python / predictions | `.venv` at repo root, `pip install -r python/requirements.txt`, model in `python/model/`, set `AGRIWEATHER_PYTHON_BIN` on Mac/Linux, run `verify_model_load.py` |
