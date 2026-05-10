@@ -140,6 +140,9 @@
         return 'Normal';
     };
 
+    const formatRainfall = (rainfall) => `${Number(rainfall).toFixed(3)} mm`;
+    const formatWindSpeed = (windSpeed) => `${Number(windSpeed).toFixed(3)} km/h`;
+
     const renderModelPerformance = (modelPerformance) => {
         if (!modelAccuracyEl || !modelConfidenceEl || !modelRainR2El || !modelWindR2El || !modelDatasetEl) {
             return;
@@ -198,8 +201,8 @@
                 </div>
                 <div class="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
                     <p class="ai-pill rounded-xl border border-slate-100 bg-slate-50 px-2 py-1 text-slate-700"><i data-lucide="thermometer" class="mr-1 inline h-3.5 w-3.5 text-rose-500"></i>${tempLabel}</p>
-                    <p class="ai-pill rounded-xl border border-slate-100 bg-slate-50 px-2 py-1 text-slate-700"><i data-lucide="cloud-rain" class="mr-1 inline h-3.5 w-3.5 text-blue-500"></i>${Number(item.rainfall).toFixed(2)} mm</p>
-                    <p class="ai-pill rounded-xl border border-slate-100 bg-slate-50 px-2 py-1 text-slate-700"><i data-lucide="wind" class="mr-1 inline h-3.5 w-3.5 text-cyan-600"></i>${Number(item.wind_speed).toFixed(2)} km/h</p>
+                    <p class="ai-pill rounded-xl border border-slate-100 bg-slate-50 px-2 py-1 text-slate-700"><i data-lucide="cloud-rain" class="mr-1 inline h-3.5 w-3.5 text-blue-500"></i>${formatRainfall(item.rainfall)}</p>
+                    <p class="ai-pill rounded-xl border border-slate-100 bg-slate-50 px-2 py-1 text-slate-700"><i data-lucide="wind" class="mr-1 inline h-3.5 w-3.5 text-cyan-600"></i>${formatWindSpeed(item.wind_speed)}</p>
                 </div>
                 <div class="weather-ai-day-rain-chance mt-2 rounded-xl border border-violet-100/80 bg-violet-50/50 px-2.5 py-2">
                     <p class="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-slate-700">
@@ -285,8 +288,8 @@
                 throw new Error('Non-numeric AI payload');
             }
 
-            rainEl.innerText = `${rainfall.toFixed(3)} mm`;
-            windEl.innerText = `${windSpeed.toFixed(3)} km/h`;
+            rainEl.innerText = formatRainfall(rainfall);
+            windEl.innerText = formatWindSpeed(windSpeed);
             statusEl.innerText = rainfallStatus(rainfall);
 
             const modelRainChance = calculateRainChance(rainfall);

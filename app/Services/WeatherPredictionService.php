@@ -77,6 +77,7 @@ class WeatherPredictionService
      */
     private function buildInputFeatures(): array
     {
+        $today = now();
         $recentRows = HistoricalWeather::query()
             ->validCalendarRows()
             ->whereDate('date', '<=', now()->toDateString())
@@ -94,9 +95,9 @@ class WeatherPredictionService
         }
 
         return [
-            'year' => (int) date('Y'),
-            'month' => (int) date('m'),
-            'day' => (int) date('d'),
+            'year' => (int) $today->format('Y'),
+            'month' => (int) $today->format('m'),
+            'day' => (int) $today->format('d'),
             'wind_direction' => $this->resolveWindDirectionFeature($recentRows->first()?->wind_direction),
             'rainfall_lag1' => (float) $recentRows[0]->rainfall,
             'rainfall_lag2' => isset($recentRows[1]) ? (float) $recentRows[1]->rainfall : (float) $recentRows[0]->rainfall,
@@ -140,6 +141,10 @@ class WeatherPredictionService
 
         $process = new Process([$pythonBin, $scriptPath, $encodedInput], base_path(), [
             'AGRIWEATHER_MODEL_PATH' => $modelPath,
+            'JOBLIB_MULTIPROCESSING' => '0',
+            'OMP_NUM_THREADS' => '1',
+            'OPENBLAS_NUM_THREADS' => '1',
+            'PYTHONNOUSERSITE' => '1',
         ]);
         $process->setTimeout(max(5, $timeout));
         $process->run();
