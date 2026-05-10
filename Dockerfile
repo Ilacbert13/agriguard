@@ -13,6 +13,7 @@ WORKDIR /var/www/html
 
 COPY . .
 
+# Installs all `require` packages from composer.lock (includes resend/resend-laravel for MAIL_MAILER=resend).
 RUN composer install --no-dev --optimize-autoloader
 
 # Frontend build runs at container start (docker/vite-build.sh), not here — keeps image smaller and matches Railway startCommand.

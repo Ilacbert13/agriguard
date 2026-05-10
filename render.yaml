@@ -70,4 +70,7 @@ services:
       - key: SESSION_SECURE_COOKIE
         value: "true"
       - key: MAIL_MAILER
-        value: log
+        value: resend
+      # Set in Render dashboard (API key from resend.com); required for outbound mail.
+      - key: RESEND_API_KEY
+        sync: false
