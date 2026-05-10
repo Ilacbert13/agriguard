@@ -28,7 +28,7 @@ RUN chmod +x /usr/local/bin/agriguard-web
 
 EXPOSE 10000
 
-# JSON CMD + exec wrapper: correct PID 1 signals (see Docker JSONArgsRecommended).
-# Static file public/up is served by PHP's built-in router before Laravel boots — stable LoadBalancer healthchecks.
-# Migrations: Render pre-deploy (render.yaml).
+# JSON CMD + exec wrapper: PID 1 runs php -S directly (see docker/web-entrypoint.sh).
+# Static file public/up is served by Laravel's server router before index.php — stable healthchecks.
+# Migrate + seed + historical-weather import: Render (render.yaml) or Railway (railway.toml).
 CMD ["/usr/local/bin/agriguard-web"]

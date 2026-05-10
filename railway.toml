@@ -1,0 +1,11 @@
+# https://docs.railway.com/guides/config-as-code
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+# Migrate → seed → historical CSV import (CSV is in the image at storage/app/public/…). /up is static.
+preDeployCommand = "php artisan migrate --force && php artisan db:seed --force && php artisan historical-weather:import storage/app/public/historical_weather.csv"
+startCommand = "/usr/local/bin/agriguard-web"
+healthcheckPath = "/up"
+# Seconds Railway waits for HTTP 2xx on healthcheckPath (raise if cold starts + migrate/seed are slow).
+healthcheckTimeout = 300

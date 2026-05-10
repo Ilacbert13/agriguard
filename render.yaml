@@ -4,7 +4,7 @@
 # Render's template (persistent disk). Private DB instances are not on the free tier.
 #
 # On first Blueprint apply: set APP_KEY when prompted (`php artisan key:generate --show`).
-# Optional: in the web Shell run `php artisan db:seed --force` once for the default admin.
+# preDeployCommand runs migrate + seed + historical weather CSV import each deploy.
 
 services:
   - type: pserv
@@ -33,8 +33,8 @@ services:
     plan: free
     # GET /up is served as static public/up (see Dockerfile) so probes succeed without booting Laravel.
     healthCheckPath: /up
-    # Runs before traffic shifts to new deploys; keeps Dockerfile CMD free of migrate so the server starts without blocking on MySQL.
-    preDeployCommand: php artisan migrate --force
+    # Runs before traffic shifts to new deploys (Dockerfile CMD only starts the web server).
+    preDeployCommand: "php artisan migrate --force && php artisan db:seed --force && php artisan historical-weather:import storage/app/public/historical_weather.csv"
     envVars:
       - key: APP_ENV
         value: production
