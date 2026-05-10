@@ -1,7 +1,9 @@
 // AGRIGUARD login + auth password fields
 // - Toggle password visibility without relying on Lucide's DOM replacement.
 
-document.addEventListener('DOMContentLoaded', () => {
+import { domReady } from '../shared/domReady';
+
+domReady(() => {
     document.querySelectorAll('.input-wrap.with-password-toggle').forEach((wrap) => {
         const toggleBtn = wrap.querySelector('[data-password-toggle]');
         const passwordInput = wrap.querySelector('[data-password-input]');

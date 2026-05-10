@@ -1,6 +1,8 @@
 /**
  * AGRIGUARD Forgot password page – page-specific script (no form behavior yet)
  */
-document.addEventListener('DOMContentLoaded', function () {
+import { domReady } from '../shared/domReady';
+
+domReady(function () {
     // Placeholder for any forgot-password page behavior
 });

@@ -1,4 +1,6 @@
-document.addEventListener('DOMContentLoaded', () => {
+import { domReady } from '../shared/domReady';
+
+domReady(() => {
     const input = document.getElementById('code');
     if (input && input.tagName === 'INPUT') {
         const sanitize = () => {

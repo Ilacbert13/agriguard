@@ -1,7 +1,8 @@
 // AGRIGUARD registration — barangay list from centralized API
 
 import { initBarangaySelect } from '../shared/barangaySelect';
+import { domReady } from '../shared/domReady';
 
-document.addEventListener('DOMContentLoaded', () => {
+domReady(() => {
     initBarangaySelect(document.getElementById('farm_barangay_code'));
 });
