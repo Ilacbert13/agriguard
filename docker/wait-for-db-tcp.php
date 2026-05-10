@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 /**
  * Exit 0 once MySQL accepts TCP on the host/port from Laravel DB env.
- * Used by agriguard-predeploy before migrate — avoids Railway "connection refused"
+ * Used by docker/agriguard-start.sh before migrate — avoids "connection refused" while MySQL boots.
  * when MySQL is still booting.
  */
 $endpoint = static function (): array {

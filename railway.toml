@@ -3,9 +3,9 @@
 builder = "DOCKERFILE"
 
 [deploy]
-# Wait for MySQL TCP, then migrate → seed → CSV import (see docker/agriguard-predeploy.sh).
-preDeployCommand = "/usr/local/bin/agriguard-predeploy"
-startCommand = "/usr/local/bin/agriguard-web"
+# Do not use preDeployCommand for migrate: it often cannot reach private MySQL (*.railway.internal).
+# DB setup runs in the container start script (docker/agriguard-start.sh) instead.
+startCommand = "/usr/local/bin/agriguard-start"
 healthcheckPath = "/up"
-# Seconds Railway waits for HTTP 2xx on healthcheckPath (raise if cold starts + migrate/seed are slow).
-healthcheckTimeout = 300
+# Migrate + seed + CSV import can exceed 5m on first deploy — increase if healthchecks fail.
+healthcheckTimeout = 600

@@ -4,7 +4,7 @@
 # Render's template (persistent disk). Private DB instances are not on the free tier.
 #
 # On first Blueprint apply: set APP_KEY when prompted (`php artisan key:generate --show`).
-# preDeployCommand runs migrate + seed + historical weather CSV import each deploy.
+# Migrate/seed/CSV run in the container CMD (docker/agriguard-start.sh), not pre-deploy.
 
 services:
   - type: pserv
@@ -31,10 +31,8 @@ services:
     name: agriguard
     runtime: docker
     plan: free
-    # GET /up is served as static public/up (see Dockerfile) so probes succeed without booting Laravel.
+    # GET /up is served after agriguard-start finishes DB setup (static public/up).
     healthCheckPath: /up
-    # Waits for MySQL then migrate / seed / CSV import (docker/agriguard-predeploy.sh).
-    preDeployCommand: "/usr/local/bin/agriguard-predeploy"
     envVars:
       - key: APP_ENV
         value: production

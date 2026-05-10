@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
+# Optional local/docker helper: production images use agriguard-start (DB setup + this server).
 # Bind $PORT (Railway/Render inject this). Do not use `php artisan serve` here: it wraps a
 # child `php -S` process, which complicates signals and can delay bind — bad for healthchecks.
 # CWD must be /public: Laravel's server.php resolves static files (e.g. /up) from getcwd().
