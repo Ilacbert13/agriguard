@@ -32,6 +32,8 @@ services:
     runtime: docker
     plan: free
     healthCheckPath: /up
+    # Runs before traffic shifts to new deploys; keeps Dockerfile CMD free of migrate so the server starts without blocking on MySQL.
+    preDeployCommand: php artisan migrate --force
     envVars:
       - key: APP_ENV
         value: production
