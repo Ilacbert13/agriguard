@@ -24,11 +24,12 @@ RUN mkdir -p storage/framework/cache \
 RUN chmod -R 775 storage bootstrap/cache
 
 COPY docker/web-entrypoint.sh /usr/local/bin/agriguard-web
-RUN chmod +x /usr/local/bin/agriguard-web
+COPY docker/agriguard-predeploy.sh /usr/local/bin/agriguard-predeploy
+RUN chmod +x /usr/local/bin/agriguard-web /usr/local/bin/agriguard-predeploy
 
 EXPOSE 10000
 
 # JSON CMD + exec wrapper: PID 1 runs php -S directly (see docker/web-entrypoint.sh).
 # Static file public/up is served by Laravel's server router before index.php — stable healthchecks.
-# Migrate + seed + historical-weather import: Render (render.yaml) or Railway (railway.toml).
+# Pre-deploy: /usr/local/bin/agriguard-predeploy (waits for DB TCP, migrate, seed, CSV import).
 CMD ["/usr/local/bin/agriguard-web"]

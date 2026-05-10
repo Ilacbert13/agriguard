@@ -33,8 +33,8 @@ services:
     plan: free
     # GET /up is served as static public/up (see Dockerfile) so probes succeed without booting Laravel.
     healthCheckPath: /up
-    # Runs before traffic shifts to new deploys (Dockerfile CMD only starts the web server).
-    preDeployCommand: "php artisan migrate --force && php artisan db:seed --force && php artisan historical-weather:import storage/app/public/historical_weather.csv"
+    # Waits for MySQL then migrate / seed / CSV import (docker/agriguard-predeploy.sh).
+    preDeployCommand: "/usr/local/bin/agriguard-predeploy"
     envVars:
       - key: APP_ENV
         value: production
