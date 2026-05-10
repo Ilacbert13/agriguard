@@ -43,8 +43,25 @@ class AppServiceProvider extends ServiceProvider
 
         URL::forceScheme('https');
 
-        $root = rtrim((string) config('app.url'), '/');
-        if ($root !== '') {
+        $configuredRoot = rtrim((string) config('app.url'), '/');
+        $railwayDomain = trim((string) env('RAILWAY_PUBLIC_DOMAIN', ''));
+        $railwayRoot = $railwayDomain !== '' ? 'https://'.$railwayDomain : '';
+
+        $isLocalHost = static function (string $url): bool {
+            $host = parse_url($url, PHP_URL_HOST);
+            if (! is_string($host)) {
+                return false;
+            }
+
+            return in_array(strtolower($host), ['127.0.0.1', 'localhost'], true);
+        };
+
+        $root = $configuredRoot;
+        if (($root === '' || $isLocalHost($root)) && $railwayRoot !== '') {
+            $root = $railwayRoot;
+        }
+
+        if ($root !== '' && ! $isLocalHost($root)) {
             URL::forceRootUrl($root);
         }
     }
