@@ -3,15 +3,17 @@
 # Railway dashboard MUST match this file:
 #
 # Build → Builder: Docker (from Dockerfile), NOT Railpack — image installs Composer deps only;
-# Vite runs at container start (`npm install && npm run build` + `serve` below).
+# Vite runs inside agriguard-start (`npm ci && npm run build` via docker/vite-build.sh).
 #
 # Deploy → Pre-deploy command: leave COMPLETELY EMPTY.
-#   Never put `php artisan serve` here (that's the Start command).
+#   Never put `php artisan serve` or migrate here — the Start command below runs DB setup first.
 #
 # Deploy → Custom Start Command: leave empty so `startCommand` below applies.
 #
-# No Railway Shell? Run DB setup locally against prod DB, or temporarily set startCommand to
-# docker/agriguard-start.sh (migrate+seed+import then serve) — see README.
+# Start command must exec /usr/local/bin/agriguard-start (same as Dockerfile CMD). That script runs
+# migrate → db:seed → historical-weather:import in one PHP process (docker/agriguard-db-setup.php),
+# then binds the built-in server so health checks wait until DB work finishes.
+# Overriding with only `php artisan serve` skips seeding entirely.
 #
 # Mail: set MAIL_MAILER=resend and RESEND_API_KEY (Composer installs resend/resend-laravel from
 # composer.lock at Docker build). Outbound Gmail SMTP may need IPv6 — prefer Resend/SES.
@@ -20,9 +22,8 @@
 builder = "DOCKERFILE"
 
 [deploy]
-# Inner script uses double quotes so ${PORT:-10000} expands (single-quoted sh -c would not).
-# config:clear first so Railway variables are never shadowed by a stale bootstrap/cache/config.php
-# (e.g. after local config:cache or an old deploy artifact).
-startCommand = "sh -c \"php artisan config:clear --no-interaction && npm install && npm run build && php artisan serve --host 0.0.0.0 --port ${PORT:-10000}\""
+# config:clear first so Railway env vars are never shadowed by bootstrap/cache/config.php.
+# Then Dockerfile entrypoint: vite-build → agriguard-db-setup (migrate+seed+import) → php -S on public/.
+startCommand = "sh -c \"php artisan config:clear --no-interaction && exec /usr/local/bin/agriguard-start\""
 healthcheckPath = "/up"
 healthcheckTimeout = 600
