@@ -3,9 +3,8 @@ set -eu
 
 cd /var/www/html
 
-# DB migrate/seed/import run here (not Railway pre-deploy): pre-deploy often cannot reach
-# private MySQL (connection refused on *.railway.internal); the app container can.
-php docker/wait-for-db-tcp.php
+# DB migrate/seed/import run here (not Railway pre-deploy). Wait for Laravel PDO (same as migrate).
+php docker/wait-for-laravel-db.php
 sleep "${AGRIGUARD_POST_TCP_SLEEP:-5}"
 
 php artisan migrate --force
