@@ -50,4 +50,27 @@ final class RainChance
 
         return self::calculateRainChance(max(0.0, $mm));
     }
+
+    /**
+     * Rain Chance (%) shown on the Weather page card: ML rainfall buckets when the
+     * model forecast is available; otherwise today's API probability (initial load
+     * or ML error fallback only).
+     */
+    public static function weatherPageDisplay(?float $modelTodayRainfallMm, ?int $apiFallbackPercent): ?int
+    {
+        if ($modelTodayRainfallMm !== null) {
+            return self::calculateRainChance(max(0.0, $modelTodayRainfallMm));
+        }
+
+        if ($apiFallbackPercent !== null) {
+            return max(0, min(100, $apiFallbackPercent));
+        }
+
+        return null;
+    }
+
+    public static function formatDisplay(?int $percent): string
+    {
+        return $percent !== null ? "{$percent}%" : '—';
+    }
 }

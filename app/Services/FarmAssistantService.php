@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\RainChance;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -22,6 +23,7 @@ class FarmAssistantService
         private readonly FarmRiskSnapshotService $riskSnapshotService,
         private readonly RainfallHeatmapService $rainfallHeatmapService,
         private readonly CropTimelineService $cropTimelineService,
+        private readonly WeatherPredictionService $weatherPredictionService,
     ) {}
 
     /**
@@ -36,21 +38,20 @@ class FarmAssistantService
 
         $hasGps = is_numeric($user->farm_lat ?? null) && is_numeric($user->farm_lng ?? null);
         $weather = $this->farmWeatherService->getNormalizedWeatherForUser($user);
-        $rainfallLabel = 'Low';
-        $rainfallMm = null;
-        $rainfallPop = null;
+        $apiRainFallback = isset($weather['today_rain_probability']) && is_numeric($weather['today_rain_probability'])
+            ? (int) $weather['today_rain_probability']
+            : null;
+        $displayRainChance = $this->resolveWeatherPageRainChance($apiRainFallback);
         $riskFull = $this->riskSnapshotService->buildFromNormalizedWeather($user, $weather);
         $riskSnapshot = [
-            'rain_chance_display' => (string) ($riskFull['rain_chance_display'] ?? '—'),
+            'rain_chance_display' => RainChance::formatDisplay($displayRainChance),
             'three_day_effect' => (string) ($riskFull['three_day_outlook'] ?? $riskFull['three_day_effect'] ?? ''),
         ];
         $rainfallLabel = $this->rainfallHeatmapService->intensityLabel($weather);
         $rainfallMm = isset($weather['today_expected_rainfall']) && is_numeric($weather['today_expected_rainfall'])
             ? (float) $weather['today_expected_rainfall']
             : null;
-        $rainfallPop = isset($weather['today_rain_probability']) && is_numeric($weather['today_rain_probability'])
-            ? (int) $weather['today_rain_probability']
-            : null;
+        $rainfallPop = $displayRainChance;
 
         $sessionLang = (string) session('assistant_language_preference', self::LANG_EN);
         $sessionLang = in_array($sessionLang, [self::LANG_EN, self::LANG_TL, self::LANG_TAGLISH], true)
@@ -73,9 +74,33 @@ class FarmAssistantService
             'temperature_c' => is_numeric($weather['current_temperature'] ?? null) ? (float) $weather['current_temperature'] : null,
             'humidity' => is_numeric($weather['humidity'] ?? null) ? (int) $weather['humidity'] : null,
             'risk_snapshot' => $riskSnapshot,
+            'display_rain_chance_percent' => $displayRainChance,
+            'api_rain_fallback_percent' => $apiRainFallback,
             'current_date_human' => now()->format('l, F j, Y'),
             'assistant_language_preference' => $sessionLang,
         ];
+    }
+
+    /**
+     * Matches Weather page Rain Chance: ML model rainfall buckets when available,
+     * API today probability only as initial / error fallback.
+     */
+    private function resolveWeatherPageRainChance(?int $apiFallbackPercent): ?int
+    {
+        $modelTodayRainfallMm = null;
+
+        try {
+            $prediction = $this->weatherPredictionService->predict();
+            $forecast = is_array($prediction['forecast'] ?? null) ? $prediction['forecast'] : [];
+            $today = $forecast[0] ?? null;
+            if (is_array($today) && is_numeric($today['rainfall'] ?? null)) {
+                $modelTodayRainfallMm = (float) $today['rainfall'];
+            }
+        } catch (\Throwable) {
+            $modelTodayRainfallMm = null;
+        }
+
+        return RainChance::weatherPageDisplay($modelTodayRainfallMm, $apiFallbackPercent);
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\HistoricalWeather;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -43,17 +44,31 @@ class WeatherPredictionService
         $cacheMinutes = (int) config('agriweather.prediction.cache_minutes', 15);
         $cacheKey = $this->buildCacheKey($jsonInput);
 
-        $prediction = Cache::remember(
-            $cacheKey,
-            now()->addMinutes(max(1, $cacheMinutes)),
-            fn (): array => $this->invokePythonPredictor($jsonInput)
-        );
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached)) {
+            return $this->requestMemo[$jsonInput] = $cached;
+        }
 
-        return $this->requestMemo[$jsonInput] = array_merge($prediction, [
-            'source' => 'model',
+        try {
+            $prediction = $this->invokePythonPredictorWithRetry($jsonInput);
+            $prediction['source'] = 'model';
+        } catch (\Throwable $exception) {
+            Log::warning('ML predictor unavailable, using statistical fallback', [
+                'message' => $exception->getMessage(),
+                'exception' => $exception::class,
+            ]);
+            $prediction = $this->buildStatisticalFallbackPrediction($input);
+            $prediction['source'] = 'statistical_fallback';
+        }
+
+        $result = array_merge($prediction, [
             'features' => $input,
             'computed_at' => now()->toIso8601String(),
         ]);
+
+        Cache::put($cacheKey, $result, now()->addMinutes(max(1, $cacheMinutes)));
+
+        return $this->requestMemo[$jsonInput] = $result;
     }
 
     private function buildCacheKey(string $jsonInput): string
@@ -116,6 +131,116 @@ class WeatherPredictionService
      *   forecast: array<int, array{day:int,date:?string,rainfall:float,wind_speed:float}>
      * }
      */
+    private function invokePythonPredictorWithRetry(string $jsonInput): array
+    {
+        $attempts = max(1, (int) config('agriweather.prediction.retry_attempts', 2));
+        $lastException = null;
+
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+            try {
+                return $this->invokePythonPredictor($jsonInput);
+            } catch (\Throwable $exception) {
+                $lastException = $exception;
+                if ($attempt < $attempts && $this->shouldRetryPredictor($exception)) {
+                    usleep(150_000);
+
+                    continue;
+                }
+                throw $exception;
+            }
+        }
+
+        throw $lastException ?? new RuntimeException('ML predictor failed.');
+    }
+
+    private function shouldRetryPredictor(\Throwable $exception): bool
+    {
+        $message = $exception->getMessage();
+
+        return str_contains($message, 'WinError 10106')
+            || str_contains($message, 'service provider could not be loaded');
+    }
+
+    /**
+     * @param  array<string, float|int>  $input
+     * @return array{
+     *   status: string,
+     *   rainfall: float,
+     *   wind_speed: float,
+     *   forecast: array<int, array{day:int,date:?string,rainfall:float,wind_speed:float}>,
+     *   model_performance: array<string, float|string|null>,
+     *   fallback: bool
+     * }
+     */
+    private function buildStatisticalFallbackPrediction(array $input): array
+    {
+        $start = now();
+        $rain = max(0.0, (float) ($input['rainfall_avg3'] ?? $input['rainfall_lag1'] ?? 0));
+        $wind = max(0.0, (float) ($input['wind_avg3'] ?? $input['wind_lag1'] ?? 0));
+        $forecast = [];
+
+        for ($dayIndex = 1; $dayIndex <= 5; $dayIndex++) {
+            $dayDate = $start->copy()->addDays($dayIndex - 1);
+            $forecast[] = [
+                'day' => $dayIndex,
+                'date' => $dayDate->toDateString(),
+                'rainfall' => round($rain, 4),
+                'wind_speed' => round($wind, 4),
+            ];
+            $rain = max(0.0, ($rain + (float) ($input['rainfall_lag1'] ?? $rain)) / 2);
+            $wind = max(0.0, ($wind + (float) ($input['wind_lag1'] ?? $wind)) / 2);
+        }
+
+        $perf = config('agriweather.model_performance', []);
+        $overall = is_numeric($perf['overall_accuracy'] ?? null) ? (float) $perf['overall_accuracy'] : null;
+
+        return [
+            'status' => 'success',
+            'rainfall' => $forecast[0]['rainfall'],
+            'wind_speed' => $forecast[0]['wind_speed'],
+            'forecast' => $forecast,
+            'model_performance' => [
+                'overall_accuracy' => $overall,
+                'rainfall_r2' => is_numeric($perf['rainfall_r2'] ?? null) ? (float) $perf['rainfall_r2'] : null,
+                'wind_r2' => is_numeric($perf['wind_r2'] ?? null) ? (float) $perf['wind_r2'] : null,
+                'confidence' => $overall !== null && $overall >= 80 ? 'Medium' : 'Low',
+                'dataset' => is_string($perf['dataset'] ?? null) ? $perf['dataset'] : 'Historical trend estimate',
+                'source' => 'statistical_fallback',
+            ],
+            'fallback' => true,
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function predictorProcessEnv(string $modelPath): array
+    {
+        $overrides = [
+            'AGRIWEATHER_MODEL_PATH' => $modelPath,
+            'JOBLIB_MULTIPROCESSING' => '0',
+            'OMP_NUM_THREADS' => '1',
+            'OPENBLAS_NUM_THREADS' => '1',
+        ];
+
+        if (PHP_OS_FAMILY !== 'Windows') {
+            return $overrides;
+        }
+
+        $inherited = [];
+        foreach (['SystemRoot', 'WINDIR', 'PATH', 'TEMP', 'TMP', 'USERPROFILE', 'LOCALAPPDATA', 'COMSPEC'] as $key) {
+            $value = getenv($key);
+            if ($value === false && isset($_SERVER[$key]) && is_string($_SERVER[$key])) {
+                $value = $_SERVER[$key];
+            }
+            if (is_string($value) && $value !== '') {
+                $inherited[$key] = $value;
+            }
+        }
+
+        return array_merge($inherited, $overrides);
+    }
+
     private function invokePythonPredictor(string $jsonInput): array
     {
         $scriptPath = (string) config('agriweather.prediction.script_path', base_path('python/predict.py'));
@@ -139,13 +264,7 @@ class WeatherPredictionService
         $encodedInput = base64_encode($jsonInput);
         $timeout = (int) config('agriweather.prediction.timeout_seconds', 45);
 
-        $process = new Process([$pythonBin, $scriptPath, $encodedInput], base_path(), [
-            'AGRIWEATHER_MODEL_PATH' => $modelPath,
-            'JOBLIB_MULTIPROCESSING' => '0',
-            'OMP_NUM_THREADS' => '1',
-            'OPENBLAS_NUM_THREADS' => '1',
-            'PYTHONNOUSERSITE' => '1',
-        ]);
+        $process = new Process([$pythonBin, $scriptPath, $encodedInput], base_path(), $this->predictorProcessEnv($modelPath));
         $process->setTimeout(max(5, $timeout));
         $process->run();
 

@@ -23,6 +23,8 @@
             class="dashboard-container assistant-main w-full min-w-0 max-w-3xl mx-auto px-4 sm:px-5"
             data-chat-url="{{ route('assistant.chat') }}"
             data-clear-url="{{ route('assistant.clear') }}"
+            data-prediction-url="{{ route('api.weather-prediction', [], false) }}"
+            data-api-rain-fallback="{{ is_numeric(data_get($ctx, 'api_rain_fallback_percent')) ? (int) data_get($ctx, 'api_rain_fallback_percent') : '' }}"
             data-context='@json($ctx)'
             data-history='@json($chatHistory)'
         >
@@ -86,8 +88,8 @@
                 </div>
             </header>
 
-            <section class="assistant-snapshot">
-                Today&apos;s snapshot: {{ is_numeric(data_get($ctx, 'rainfall_probability')) && (int) data_get($ctx, 'rainfall_probability') < 50 ? 'Good conditions for field work today.' : 'Stay alert for rain and choose lower-risk field tasks.' }}
+            <section class="assistant-snapshot" id="assistant-snapshot">
+                Today&apos;s snapshot: {{ is_numeric(data_get($ctx, 'display_rain_chance_percent')) && (int) data_get($ctx, 'display_rain_chance_percent') < 50 ? 'Good conditions for field work today.' : 'Stay alert for rain and choose lower-risk field tasks.' }}
             </section>
 
             <section class="assistant-summary-shell ag-card" aria-label="Farm and weather context">
@@ -121,7 +123,7 @@
                             <span class="assistant-card-icon"><i data-lucide="cloud-rain"></i></span>
                             <p class="assistant-card-label">Rain Chance</p>
                         </div>
-                        <p class="assistant-card-value">{{ data_get($ctx, 'risk_snapshot.rain_chance_display', '—') }}</p>
+                        <p id="assistant-rain-chance-value" class="assistant-card-value">{{ data_get($ctx, 'risk_snapshot.rain_chance_display', '—') }}</p>
                     </article>
                 </div>
             </section>

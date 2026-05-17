@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Services\AiAdvisory\AiAdvisoryService;
 use App\Services\ThreeDayWeatherOutlookService;
 use App\Services\WeatherAdvisoryService;
+use App\Services\WeatherPredictionService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class WeatherDetailsController extends Controller
@@ -16,9 +18,9 @@ class WeatherDetailsController extends Controller
     public function show(
         WeatherAdvisoryService $weatherService,
         AiAdvisoryService $aiAdvisory,
-        ThreeDayWeatherOutlookService $threeDayOutlook
-    ): View
-    {
+        ThreeDayWeatherOutlookService $threeDayOutlook,
+        WeatherPredictionService $weatherPredictionService,
+    ): View {
         $user = Auth::user();
         $data = $weatherService->getAdvisoryData($user);
 
@@ -76,6 +78,16 @@ class WeatherDetailsController extends Controller
             'failed' => (($weatherRun['_meta']['ai_status'] ?? 'failed') !== 'success'),
         ];
 
+        $mlPrediction = null;
+        try {
+            $mlPrediction = $weatherPredictionService->predict();
+        } catch (\Throwable $exception) {
+            Log::warning('Weather page could not preload ML prediction', [
+                'message' => $exception->getMessage(),
+                'exception' => $exception::class,
+            ]);
+        }
+
         return view('user.weather.weather-details', [
             'weather' => $weather,
             'forecast' => $forecast,
@@ -90,6 +102,7 @@ class WeatherDetailsController extends Controller
             'recommendation' => $smartRecommendation['recommendation'],
             'recommendation_failed' => $smartRecommendation['failed'],
             'weather_outlook' => $weatherOutlook,
+            'ml_prediction' => $mlPrediction,
         ]);
     }
 

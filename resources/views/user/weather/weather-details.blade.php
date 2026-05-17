@@ -351,6 +351,7 @@
 @push('scripts')
     {{-- Relative URL keeps fetch same-origin when APP_URL host differs from the browser (e.g. localhost vs 127.0.0.1). --}}
     <script id="ai-weather-config" type="application/json">@json(['prediction_url' => route('api.weather-prediction', [], false)])</script>
+    <script id="ai-weather-initial-prediction" type="application/json">@json($ml_prediction ?? null)</script>
     <script id="ai-api-temps-json" type="application/json">@json($aiApiTempsByDate)</script>
     <script id="ai-weather-rain-json" type="application/json">@json([
         'api_today_precip_percent' => $apiTodayPrecip ?? null,

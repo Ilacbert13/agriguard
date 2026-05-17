@@ -1,3 +1,8 @@
+import {
+    calculateRainChanceFromRainfall,
+    publishDisplayRainChance,
+} from '../shared/displayRainChance.js';
+
 (() => {
     'use strict';
 
@@ -33,6 +38,18 @@
         }
     };
 
+    const parseJsonScriptNullable = (id) => {
+        const node = document.getElementById(id);
+        if (!node) {
+            return null;
+        }
+        try {
+            return JSON.parse(node.textContent || 'null');
+        } catch (_error) {
+            return null;
+        }
+    };
+
     const config = parseJsonScript('ai-weather-config');
     const predictionUrl = typeof config.prediction_url === 'string' ? config.prediction_url : '';
     if (predictionUrl === '') {
@@ -43,27 +60,7 @@
     const rainConfig = parseJsonScript('ai-weather-rain-json');
     const apiTodayPrecipRaw = rainConfig.api_today_precip_percent;
 
-    const calculateRainChance = (rainfall) => {
-        const r = Number(rainfall);
-        if (!Number.isFinite(r) || r <= 0) {
-            return 5;
-        }
-        if (r <= 0.1) {
-            const scaled = 5 + Math.sqrt(r / 0.1) * 9;
-
-            return Math.max(5, Math.min(14, Math.round(scaled)));
-        }
-        if (r <= 0.5) {
-            return 15;
-        }
-        if (r <= 2) {
-            return 40;
-        }
-        if (r <= 10) {
-            return 70;
-        }
-        return 90;
-    };
+    const calculateRainChance = calculateRainChanceFromRainfall;
 
     const rainChanceTier = (pct) => {
         const p = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
@@ -105,10 +102,11 @@
         requestAnimationFrame(step);
     };
 
-    const applyRainChanceBlock = (pct, { animate } = { animate: true }) => {
+    const applyRainChanceBlock = (pct, { animate, source } = { animate: true, source: 'model' }) => {
         if (!rainChanceTextEl || !rainChanceBlockEl) {
             return;
         }
+        publishDisplayRainChance(pct, { source: source || 'model' });
         const tier = rainChanceTier(pct);
         rainChanceBlockEl.classList.remove('weather-rain-chance-tier--low', 'weather-rain-chance-tier--moderate', 'weather-rain-chance-tier--high');
         rainChanceBlockEl.classList.add(`weather-rain-chance-tier--${tier}`);
@@ -242,22 +240,67 @@
         return actions.join(' ');
     };
 
-    const renderSmartAdvisoryFromModel = (rainfall, windSpeed) => {
+    const renderSmartAdvisoryFromModel = (rainfall, windSpeed, source) => {
         if (smartActionEl) {
             smartActionEl.innerText = advisoryFromModel(rainfall, windSpeed);
         }
         if (smartStatusEl) {
             smartStatusEl.className = 'text-emerald-700';
-            smartStatusEl.innerText = 'AI Smart Advisory: Synced to ML forecast';
+            if (source === 'statistical_fallback') {
+                smartStatusEl.innerText = 'AI Smart Advisory: Based on recent historical trend (ML offline)';
+            } else {
+                smartStatusEl.innerText = 'AI Smart Advisory: Synced to ML forecast';
+            }
         }
     };
+
+    const applyPredictionPayload = (data) => {
+        if (!Array.isArray(data?.forecast) || data.forecast.length === 0) {
+            throw new Error('Invalid AI payload');
+        }
+
+        const today = data.forecast[0];
+        const rainfall = Number(today.rainfall);
+        const windSpeed = Number(today.wind_speed);
+        if (!Number.isFinite(rainfall) || !Number.isFinite(windSpeed)) {
+            throw new Error('Non-numeric AI payload');
+        }
+
+        const source = typeof data.source === 'string' ? data.source : 'model';
+        const rainChanceSource = source === 'statistical_fallback' ? 'model' : source;
+
+        rainEl.innerText = formatRainfall(rainfall);
+        windEl.innerText = formatWindSpeed(windSpeed);
+        statusEl.innerText = rainfallStatus(rainfall);
+
+        const modelRainChance = calculateRainChance(rainfall);
+        if (rainChanceTextEl && rainChanceBlockEl) {
+            applyRainChanceBlock(modelRainChance, { animate: false, source: rainChanceSource });
+        }
+
+        renderFiveDay(data.forecast);
+        renderModelPerformance(data.model_performance || {});
+        renderSmartAdvisoryFromModel(rainfall, windSpeed, source);
+    };
+
+    const initialPrediction = parseJsonScriptNullable('ai-weather-initial-prediction');
+    let hasAppliedPrediction = false;
+
+    if (initialPrediction && Array.isArray(initialPrediction.forecast) && initialPrediction.forecast.length > 0) {
+        try {
+            applyPredictionPayload(initialPrediction);
+            hasAppliedPrediction = true;
+        } catch (_error) {
+            hasAppliedPrediction = false;
+        }
+    }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 100000);
 
     const apiPct = todayRainChancePercent();
-    if (apiPct !== null && rainChanceTextEl && rainChanceBlockEl) {
-        applyRainChanceBlock(apiPct, { animate: false });
+    if (!hasAppliedPrediction && apiPct !== null && rainChanceTextEl && rainChanceBlockEl) {
+        applyRainChanceBlock(apiPct, { animate: false, source: 'api_fallback' });
     }
 
     fetch(predictionUrl, {
@@ -277,31 +320,14 @@
             return data;
         })
         .then((data) => {
-            if (!Array.isArray(data.forecast) || data.forecast.length === 0) {
-                throw new Error('Invalid AI payload');
-            }
-
-            const today = data.forecast[0];
-            const rainfall = Number(today.rainfall);
-            const windSpeed = Number(today.wind_speed);
-            if (!Number.isFinite(rainfall) || !Number.isFinite(windSpeed)) {
-                throw new Error('Non-numeric AI payload');
-            }
-
-            rainEl.innerText = formatRainfall(rainfall);
-            windEl.innerText = formatWindSpeed(windSpeed);
-            statusEl.innerText = rainfallStatus(rainfall);
-
-            const modelRainChance = calculateRainChance(rainfall);
-            if (rainChanceTextEl && rainChanceBlockEl) {
-                applyRainChanceBlock(modelRainChance, { animate: false });
-            }
-
-            renderFiveDay(data.forecast);
-            renderModelPerformance(data.model_performance || {});
-            renderSmartAdvisoryFromModel(rainfall, windSpeed);
+            applyPredictionPayload(data);
+            hasAppliedPrediction = true;
         })
         .catch((err) => {
+            if (hasAppliedPrediction) {
+                return;
+            }
+
             rainEl.innerText = 'Not available';
             windEl.innerText = 'Not available';
             statusEl.innerText = 'Unavailable';
@@ -309,11 +335,11 @@
                 err && err.name === 'AbortError'
                     ? 'Prediction request timed out. If this persists, increase PHP max_execution_time and confirm .venv has ML packages.'
                     : (err && err.message) || 'Prediction request failed. Check laravel.log.';
-            fiveDayEl.innerHTML = `<p>${msg}</p>`;
+            fiveDayEl.innerHTML = `<p class="text-slate-700">${msg}</p>`;
             renderModelPerformance({});
             if (rainChanceTextEl && rainChanceBlockEl) {
                 if (apiPct !== null) {
-                    applyRainChanceBlock(apiPct, { animate: false });
+                    applyRainChanceBlock(apiPct, { animate: false, source: 'api_fallback' });
                 } else {
                     rainChanceTextEl.textContent = 'Not available';
                     if (rainChanceBarEl) {

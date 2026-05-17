@@ -11,6 +11,7 @@ return [
         'model_path' => env('AGRIWEATHER_MODEL_PATH', base_path('python/model/xgboost_weather_model.pkl')),
         'timeout_seconds' => (int) env('AGRIWEATHER_PREDICT_TIMEOUT', 45),
         'cache_minutes' => (int) env('AGRIWEATHER_PREDICT_CACHE_MINUTES', 15),
+        'retry_attempts' => (int) env('AGRIWEATHER_PREDICT_RETRY_ATTEMPTS', 2),
     ],
 
     'model_performance' => [

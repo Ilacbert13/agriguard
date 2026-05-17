@@ -1,3 +1,9 @@
+import {
+    readCachedDisplayRainChance,
+    resolveDisplayRainChancePercent,
+    subscribeDisplayRainChance,
+} from '../shared/displayRainChance.js';
+
 (function () {
     'use strict';
 
@@ -80,6 +86,71 @@
         var clearUrl = root.dataset.clearUrl || '';
         var context = parseJson(root.dataset.context, {});
         var history = parseJson(root.dataset.history, []);
+
+        var rainChanceEl = document.getElementById('assistant-rain-chance-value');
+        var apiRainFallback = root.dataset.apiRainFallback;
+        var apiRainFallbackNum =
+            apiRainFallback !== undefined && apiRainFallback !== '' && Number.isFinite(Number(apiRainFallback))
+                ? Math.max(0, Math.min(100, Math.round(Number(apiRainFallback))))
+                : null;
+        var predictionUrl = root.dataset.predictionUrl || '';
+
+        function applyAssistantRainChance(percent) {
+            if (!rainChanceEl || percent === null || percent === undefined || !Number.isFinite(Number(percent))) {
+                return;
+            }
+            var pct = Math.max(0, Math.min(100, Math.round(Number(percent))));
+            rainChanceEl.textContent = pct + '%';
+            context.rainfall_probability = pct;
+            if (context.risk_snapshot && typeof context.risk_snapshot === 'object') {
+                context.risk_snapshot.rain_chance_display = pct + '%';
+            }
+            var snapshotEl = document.getElementById('assistant-snapshot');
+            if (snapshotEl) {
+                snapshotEl.textContent =
+                    "Today's snapshot: " +
+                    (pct < 50
+                        ? 'Good conditions for field work today.'
+                        : 'Stay alert for rain and choose lower-risk field tasks.');
+            }
+        }
+
+        var cachedRain = readCachedDisplayRainChance();
+        if (cachedRain) {
+            applyAssistantRainChance(cachedRain.percent);
+        }
+
+        subscribeDisplayRainChance(function (payload) {
+            applyAssistantRainChance(payload.percent);
+        });
+
+        if (predictionUrl) {
+            fetch(predictionUrl, {
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            })
+                .then(function (r) {
+                    return r.json().then(function (data) {
+                        return { ok: r.ok, data: data };
+                    });
+                })
+                .then(function (wrapped) {
+                    if (!wrapped || !wrapped.ok) return;
+                    var pct = resolveDisplayRainChancePercent(wrapped.data, apiRainFallbackNum);
+                    if (pct !== null) {
+                        applyAssistantRainChance(pct);
+                    }
+                })
+                .catch(function () {
+                    if (apiRainFallbackNum !== null) {
+                        applyAssistantRainChance(apiRainFallbackNum);
+                    }
+                });
+        }
+
         var canChat = !!(context && context.has_gps);
 
         var formEl = document.getElementById('assistant-form');
